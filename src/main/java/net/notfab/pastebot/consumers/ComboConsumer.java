@@ -1,5 +1,8 @@
 package net.notfab.pastebot.consumers;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,6 +20,13 @@ public class ComboConsumer implements BiConsumer<String, String> {
     public void accept(String string, String url) {
         Matcher matcher = pattern.matcher(string);
         if (matcher.find()) {
+            try {
+                FileWriter fileWriter = new FileWriter(new File("ComboConsumer.txt"), true);
+                fileWriter.write(matcher.group(1) + ":" + matcher.group(2) + " - " + url + "\n");
+                fileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             System.out.println("[Combo] Found password combo -> " + matcher.group(1) + ":" + matcher.group(2) + " @ " + url);
         }
     }
