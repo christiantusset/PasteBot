@@ -4,6 +4,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -20,6 +22,7 @@ public class ProxyFetcher {
     private List<Proxy> working = new ArrayList<>();
     private List<String> userAgent = new ArrayList<>();
     private ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+    private Logger logger = LoggerFactory.getLogger(ProxyFetcher.class);
     private int current = 0;
 
     public ProxyFetcher() {
@@ -52,9 +55,10 @@ public class ProxyFetcher {
         // --
         service.scheduleAtFixedRate(() -> {
             int current = working.size();
-            System.out.println("[ProxyFetcher] Adding some proxies...");
+            logger.info("[ProxyFetcher] Adding some proxies...");
+            this.saveProxies();
             this.working.addAll(getSomeProxies());
-            System.out.println("[ProxyFetcher] Added " + (working.size() - current) + " proxies.");
+            logger.info("[ProxyFetcher] Added " + (working.size() - current) + " proxies.");
         }, 5, 10, TimeUnit.MINUTES);
     }
 
@@ -73,10 +77,10 @@ public class ProxyFetcher {
     public void remove(Proxy proxy, int reason) {
         if (reason == 0) {
             // HTTP 403 (Banned)
-            System.out.println("[Proxy] Banned " + proxy.toString());
+            logger.warn("[Proxy] Banned " + proxy.toString());
         } else if (reason == 1) {
             // Timed Out
-            System.out.println("[Proxy] Offline " + proxy.toString());
+            logger.debug("[Proxy] Offline " + proxy.toString());
             this.working.remove(proxy);
         } else {
             // Unknown (PKIX?)
@@ -92,7 +96,7 @@ public class ProxyFetcher {
             list.add(ip + ":" + port);
         });
         try {
-            FileWriter writer = new FileWriter("proxy-working.txt");
+            FileWriter writer = new FileWriter("proxy.txt");
             list.forEach(x -> {
                 try {
                     writer.write(x + "\n");
@@ -106,7 +110,7 @@ public class ProxyFetcher {
         }
     }
 
-    public List<Proxy> getSomeProxies() {
+    private List<Proxy> getSomeProxies() {
         List<Proxy> allFound = new ArrayList<>();
         allFound.addAll(getFromHideMyNA());
         allFound.addAll(getFromSSLProxies());

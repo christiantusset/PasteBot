@@ -1,13 +1,14 @@
 package net.notfab.pastebot;
 
-import net.notfab.pastebot.consumers.ComboConsumer;
-import net.notfab.pastebot.consumers.EmailConsumer;
-import net.notfab.pastebot.consumers.IPv4Consumer;
-import net.notfab.pastebot.consumers.KeywordConsumer;
+import net.notfab.pastebot.scrapers.IPv4Scraper;
+import net.notfab.pastebot.scrapers.KeywordScraper;
+import net.notfab.pastebot.scrapers.MailScraper;
 import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.Proxy;
@@ -20,32 +21,38 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 
 public class PasteBot {
 
-    private List<BiConsumer<String, String>> consumers = new ArrayList<>();
+    private List<PasteScraper> consumers = new ArrayList<>();
     private Deque<String> toCheck = new ArrayDeque<>();
     private List<String> used = new ArrayList<>();
     private ProxyFetcher fetcher = new ProxyFetcher();
-
     private ScheduledExecutorService service = Executors.newScheduledThreadPool(2);
+    private Logger logger = LoggerFactory.getLogger(PasteBot.class);
+    private Long lastRun;
 
-    int success = 0;
-    int failed = 0;
+    private int success = 0;
+    private int failed = 0;
 
     public PasteBot() {
-        this.consumers.add(new KeywordConsumer());
-        this.consumers.add(new EmailConsumer());
-        this.consumers.add(new ComboConsumer());
-        this.consumers.add(new IPv4Consumer());
-
+        this.consumers.add(new IPv4Scraper());
+        this.consumers.add(new MailScraper());
+        this.consumers.add(new KeywordScraper());
         this.toCheck.add("https://pastebin.com/B5XQiMPM");
-
         service.scheduleAtFixedRate(() -> {
-            System.out.println("[Metrics] Success = " + success + " / Failed = " + failed + " / Queue = " + toCheck.size());
+            if((System.currentTimeMillis() - lastRun) >= TimeUnit.SECONDS.toMillis(15)) {
+                this.schedule();
+                logger.warn("[Metrics] Detected dead task, starting again...");
+            }
+            logger.info("[Metrics] Success = " + success + " / Failed = " + failed + " / Queue = " + toCheck.size());
         }, 1, 5, TimeUnit.SECONDS);
+        this.schedule();
+    }
+
+    private void schedule() {
         service.scheduleAtFixedRate(() -> {
+            lastRun = System.currentTimeMillis();
             String url = toCheck.pollFirst();
             if (used.contains(url)) return;
             try {
@@ -64,11 +71,10 @@ public class PasteBot {
         }, 1, 1, TimeUnit.SECONDS);
     }
 
-    private boolean scan(String url) throws InterruptedException {
+    private boolean scan(String url) {
         Proxy proxy = fetcher.next();
         try {
             if (proxy == null) {
-                // Readd \/
                 return false;
             }
             Document document = Jsoup.connect(url)
@@ -79,16 +85,13 @@ public class PasteBot {
             if (document == null)
                 return true;
             List<String> others = extractLinks(document);
-            if (others.isEmpty()) {
-                Thread.sleep(10000);
-            }
             this.toCheck.addAll(others);
             // -- Parse text
             Element content = document.getElementById("paste_code");
             String string = content.text();
             consumers.forEach(consumer -> {
                 try {
-                    consumer.accept(string, url);
+                    consumer.apply(string, url);
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
@@ -105,12 +108,11 @@ public class PasteBot {
             fetcher.remove(proxy, 1);
             return false;
         } catch (IOException e) {
-            if(e.getMessage().contains("too many")) {
+            if (e.getMessage().contains("too many")) {
                 fetcher.remove(proxy, 0);
             } else {
                 fetcher.remove(proxy, 2);
             }
-            System.out.println("Failed to parse paste " + url + " - " + e.getMessage());
             return false;
         }
     }
