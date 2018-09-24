@@ -21,6 +21,8 @@ public abstract class PasteScraper implements BiFunction<String, String, Boolean
         try {
             String id = url.substring(url.lastIndexOf('/'));
             File file = new File("scraper/" + getName() + "/" + id + ".txt");
+            file.getParentFile().mkdirs();
+            file.createNewFile();
             FileWriter writer = new FileWriter(file);
             writer.write("-----------------------------------------------------------");
             writer.write("\n");
@@ -29,6 +31,7 @@ public abstract class PasteScraper implements BiFunction<String, String, Boolean
             writer.write("Notes: " + notes);
             writer.write("\n");
             writer.write("-----------------------------------------------------------");
+            writer.write("\n");
             writer.write(content);
             writer.close();
             return true;

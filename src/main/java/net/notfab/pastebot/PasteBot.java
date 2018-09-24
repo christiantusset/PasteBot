@@ -20,6 +20,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class PasteBot {
@@ -28,7 +29,7 @@ public class PasteBot {
     private Deque<String> toCheck = new ArrayDeque<>();
     private List<String> used = new ArrayList<>();
     private ProxyFetcher fetcher = new ProxyFetcher();
-    private ScheduledExecutorService service = Executors.newScheduledThreadPool(2);
+    private ScheduledExecutorService service = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(22);
     private Logger logger = LoggerFactory.getLogger(PasteBot.class);
     private Long lastRun;
 
@@ -40,7 +41,7 @@ public class PasteBot {
         this.consumers.add(new MailScraper());
         this.consumers.add(new KeywordScraper());
         this.toCheck.add("https://pastebin.com/B5XQiMPM");
-        service.scheduleAtFixedRate(() -> {
+        this.service.scheduleAtFixedRate(() -> {
             if((System.currentTimeMillis() - lastRun) >= TimeUnit.SECONDS.toMillis(15)) {
                 this.schedule();
                 logger.warn("[Metrics] Detected dead task, starting again...");
@@ -56,6 +57,10 @@ public class PasteBot {
             String url = toCheck.pollFirst();
             if (used.contains(url)) return;
             try {
+                if(url == null) {
+                    Thread.sleep(1000);
+                    return;
+                }
                 boolean result = this.scan(url);
                 if (result) {
                     this.used.add(url);
@@ -88,6 +93,7 @@ public class PasteBot {
             this.toCheck.addAll(others);
             // -- Parse text
             Element content = document.getElementById("paste_code");
+            if(content == null) return true;
             String string = content.text();
             consumers.forEach(consumer -> {
                 try {
