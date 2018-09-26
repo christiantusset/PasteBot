@@ -31,7 +31,7 @@ public class PasteBot {
     private ProxyFetcher fetcher = new ProxyFetcher();
     private ScheduledExecutorService service = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(22);
     private Logger logger = LoggerFactory.getLogger(PasteBot.class);
-    private Long lastRun;
+    private Long lastRun = System.currentTimeMillis();
 
     private int success = 0;
     private int failed = 0;
