@@ -18,8 +18,8 @@ public class KeywordScraper extends PasteScraper {
         super("Keyword");
     }
 
-    private String[] keywords = new String[]{"udemy", "steam", "netflix", "spotify", "crunchyroll",
-           "jdbc", ".amazonaws", "senha"};
+    private String[] keywords = new String[]{"udemy", "steam", "ubisoft", "humblebundle", "nuuvem",
+        "netflix", "spotify", "crunchyroll", "jdbc", ".amazonaws", "senha"};
 
     /**
      * Searches for keywords in the paste.
